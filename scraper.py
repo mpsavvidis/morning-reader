@@ -1,7 +1,7 @@
 import json
 import feedparser
 from datetime import datetime
-import time
+import unicodedata
 
 AUTHORS = {
     "CAPITAL.GR": ["Μανόλης Καψής", "Άγης Βερούτης", "Λέανδρος Ρακιντζής", "Θάνος Τζήμερος", "Χρήστος Χωμενίδης", "Ηλίας Παπαγεωργιάδης", "Γεώργιους Ι. Μάτσος", "Γιάννης Πανούσης", "Ηλίας Ψυχογιός", "Γιώργος Ι. Κωστούλας"],
@@ -10,7 +10,6 @@ AUTHORS = {
     "Η ΚΑΘΗΜΕΡΙΝΗ": ["Αλέξης Παπαχελάς", "Τάκης Θεοδωρόπουλος", "Μιχάλης Τσιντσίνης", "Κώστας Ιορδανίδης", "Αθανάσιος Έλλις", "Νίκος Κωνσταντάρας", "Παντελής Μπουκάλας", "Τασούλα Καραϊσκάκη", "Ανδρέας Δρυμιώτης", "Μαρία Κατσουνάκη", "Νότης Παπαδόπουλος", "Κώστας Λεονταρίδης", "Ηλίας Μαγκλίνης", "Ξένια Κουναλάκη", "Παναγιώτης Λάμψιας", "Σάκης Μουμτζής", "Κώστας Καλλίτσης", "Άρης Αλεξανδρής", "Θοδωρής Γεωργακόπουλος", "Στάθης Ν. Καλύβας", "Δώρα Αντωνίου", "Γιούλη Επτακοίλη", "Ελεάννα Βλαστού", "Αριστείδης Χατζής", "Χαρίδημος Τσούκας", "Βίβιαν Στεργίου"]
 }
 
-# Επίσημες ροές RSS για άρθρα/απόψεις των συγκεκριμένων sites
 RSS_FEEDS = {
     "CAPITAL.GR": "https://www.capital.gr/rss/arthrografoi",
     "LIBERAL.GR": "https://www.liberal.gr/rss",
@@ -18,26 +17,39 @@ RSS_FEEDS = {
     "Η ΚΑΘΗΜΕΡΙΝΗ": "https://www.kathimerini.gr/opinions/feed/"
 }
 
+def normalize_greek(text):
+    """Αφαιρεί τόνους και μετατρέπει σε κεφαλαία για ακριβή ταύτιση."""
+    if not text:
+        return ""
+    text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+    return text.upper()
+
 def fetch_articles():
     articles = []
     today_str = datetime.now().strftime("%d.%m.%Y")
     
     for source, feed_url in RSS_FEEDS.items():
-        print(f"Συλλογή από: {source}")
         parsed_feed = feedparser.parse(feed_url)
         
         for entry in parsed_feed.entries:
             title = entry.get("title", "")
             link = entry.get("link", "")
-            # Προσπαθούμε να βρούμε τον συγγραφέα είτε από το tag author είτε αν αναφέρεται μέσα στον τίτλο
-            entry_author = entry.get("author", "").upper()
+            entry_author = entry.get("author", "")
+            summary = entry.get("summary", "")
             
-            # Έλεγχος αν κάποιος από τους επιθυμητούς αρθρογράφους ταιριάζει με το άρθρο
+            # Ενοποιούμε όλα τα πεδία όπου μπορεί να αναφέρεται ο αρθρογράφος
+            search_text = normalize_greek(f"{title} {entry_author} {summary}")
+            
             for author in AUTHORS[source]:
-                # Ψάχνουμε το όνομα είτε στο πεδίο του συγγραφέα είτε στον τίτλο (π.χ. "Αλέξης Παπαχελάς: Ο τίτλος")
-                if author.upper() in entry_author or author.upper() in title.upper():
+                norm_author = normalize_greek(author)
+                
+                # Δημιουργία της γενικής πτώσης αφαιρώντας το τελικό Σίγμα
+                norm_author_genitive = norm_author[:-1] if norm_author.endswith('Σ') else norm_author
+                
+                # Έλεγχος αν το όνομα υπάρχει στο άρθρο στην ονομαστική ή τη γενική
+                if norm_author in search_text or norm_author_genitive in search_text:
                     
-                    # Καθαρισμός του τίτλου αν περιέχει το όνομα του αρθρογράφου στην αρχή
+                    # Καθαρισμός τίτλου για καλύτερη εμφάνιση (αν ξεκινάει με το όνομα)
                     clean_title = title.replace(f"{author}:", "").replace(f"{author} :", "").strip()
                     
                     articles.append({
@@ -47,17 +59,13 @@ def fetch_articles():
                         "link": link,
                         "author": author
                     })
-                    break # Βρέθηκε ο αρθρογράφος, προχωράμε στο επόμενο άρθρο
+                    break 
 
-    # Κρατάμε μόνο τα μοναδικά άρθρα σε περίπτωση διπλοεγγραφών
+    # Κρατάμε μόνο τα μοναδικά links για να αποφύγουμε διπλοεγγραφές
     unique_articles = {article['link']: article for article in articles}.values()
     return list(unique_articles)
 
 if __name__ == "__main__":
-    print("Ξεκινάει η πραγματική συλλογή άρθρων...")
     data = fetch_articles()
-    
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-        
-    print(f"Ολοκληρώθηκε. Βρέθηκαν {len(data)} σημερινά άρθρα από τους αρθρογράφους σου.")
