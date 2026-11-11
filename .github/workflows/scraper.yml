@@ -1,1 +1,35 @@
+name: Daily Article Scraper
 
+on:
+  schedule:
+    - cron: '30 4 * * *' # Εκτελείται στις 04:30 UTC (06:30 ώρα Ελλάδος)
+  workflow_dispatch: # Επιτρέπει τη χειροκίνητη εκτέλεση από το GitHub
+
+permissions:
+  contents: write # Απαραίτητο για να μπορεί το bot να κάνει commit το νέο data.json
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Scraper
+        run: python scraper.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data.json
+          git commit -m "Ανανέωση άρθρων: $(date)" || echo "No changes to commit"
+          git push
