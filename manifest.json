@@ -1,0 +1,16 @@
+{
+  "name": "Πρωινή ανάγνωση",
+  "short_name": "Ανάγνωση",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F9F4EB",
+  "theme_color": "#F9F4EB",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231e293b'><path d='M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h8v2zm3-4H7v-2h11v2zm0-4H7V7h11v2z'/></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

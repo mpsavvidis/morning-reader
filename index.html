@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Πρωινή ανάγνωση</title>
     
-    <!-- Εικονίδιο Favicon -->
+    <!-- Δηλώνουμε την εφαρμογή ως PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#F9F4EB">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231e293b'><path d='M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h8v2zm3-4H7v-2h11v2zm0-4H7V7h11v2z'/></svg>">
+    
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231e293b'><path d='M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h8v2zm3-4H7v-2h11v2zm0-4H7V7h11v2z'/></svg>">
     
-    <!-- Google Fonts (Inter για UI & Merriweather για Τίτλους) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS & Παραμετροποίηση Γραμματοσειρών -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +33,6 @@
 <body class="bg-[#F9F4EB] text-slate-800 font-sans antialiased p-4 sm:p-6 md:p-8 min-h-screen selection:bg-amber-100 selection:text-amber-900">
 
     <div class="max-w-2xl mx-auto">
-        <!-- Header -->
         <header class="mb-10 flex items-center justify-between border-b border-slate-300/50 pb-5 pt-4">
             <div class="flex items-center gap-4">
                 <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-200/60 shadow-sm">
@@ -44,20 +45,14 @@
                     <p class="text-[13px] text-slate-600 font-medium mt-0.5" id="last-updated">Ενημέρωση: --</p>
                 </div>
             </div>
-            <div class="hidden sm:block text-right">
-                <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Επιλογές Αρθρογράφων</span>
-            </div>
         </header>
 
-        <!-- Container Άρθρων -->
         <main id="articles-container" class="space-y-6">
-            <!-- Loader πριν εμφανιστούν τα άρθρα -->
             <div id="loader" class="text-center py-10 animate-pulse">
                 <p class="text-sm font-medium text-slate-500">Αναζήτηση σημερινών άρθρων...</p>
             </div>
         </main>
         
-        <!-- Footer με την υπογραφή σου -->
         <footer class="mt-16 pb-8 text-center">
             <p class="text-xs font-medium text-slate-500 mb-2">Daily Reader App &middot; Ανανεώνεται αυτόματα 06:30 π.μ.</p>
             <p class="text-[11px] font-bold text-slate-400/80 uppercase tracking-widest">&copy; Michail P. Savvidis</p>
@@ -65,5 +60,20 @@
     </div>
 
     <script src="app.js"></script>
+    
+    <!-- Ενεργοποίηση του Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker εγγράφηκε επιτυχώς.');
+                    })
+                    .catch(err => {
+                        console.log('Αποτυχία εγγραφής ServiceWorker: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
