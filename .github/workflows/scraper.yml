@@ -2,11 +2,11 @@ name: Daily Article Scraper
 
 on:
   schedule:
-    - cron: '30 4 * * *' # Εκτελείται στις 04:30 UTC (06:30 ώρα Ελλάδος)
-  workflow_dispatch: # Επιτρέπει τη χειροκίνητη εκτέλεση από το GitHub
+    - cron: '30 4 * * *'
+  workflow_dispatch: {}
 
 permissions:
-  contents: write # Απαραίτητο για να μπορεί το bot να κάνει commit το νέο data.json
+  contents: write
 
 jobs:
   scrape-and-update:
