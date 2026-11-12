@@ -30,15 +30,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data.json
-          git commit -m "Ανανέωση άρθρων: $(date)" || echo "No changes to commit"
-          git push
-       - name: Commit and Push changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
           git pull --rebase origin main
           git add data.json
           git commit -m "Ανανέωση άρθρων: $(date)" || echo "No changes to commit"
           git push
-          
