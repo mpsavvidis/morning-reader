@@ -18,7 +18,6 @@ RSS_FEEDS = {
 }
 
 def normalize_greek(text):
-    """Αφαιρεί τόνους και μετατρέπει σε κεφαλαία για ακριβή ταύτιση."""
     if not text:
         return ""
     text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
@@ -34,22 +33,22 @@ def fetch_articles():
         for entry in parsed_feed.entries:
             title = entry.get("title", "")
             link = entry.get("link", "")
-            entry_author = entry.get("author", "")
             summary = entry.get("summary", "")
             
-            # Ενοποιούμε όλα τα πεδία όπου μπορεί να αναφέρεται ο αρθρογράφος
-            search_text = normalize_greek(f"{title} {entry_author} {summary}")
+            # Εντοπισμός συγγραφέα από όλα τα πιθανά πεδία του RSS
+            author_field = entry.get("author", "")
+            creator_field = entry.get("creator", "")
+            if 'author_detail' in entry and 'name' in entry.author_detail:
+                author_field += " " + entry.author_detail.name
+                
+            # Δημιουργία ενιαίου κειμένου αναζήτησης με όλα τα δεδομένα του άρθρου
+            search_text = normalize_greek(f"{title} {author_field} {creator_field} {summary}")
             
             for author in AUTHORS[source]:
                 norm_author = normalize_greek(author)
-                
-                # Δημιουργία της γενικής πτώσης αφαιρώντας το τελικό Σίγμα
                 norm_author_genitive = norm_author[:-1] if norm_author.endswith('Σ') else norm_author
                 
-                # Έλεγχος αν το όνομα υπάρχει στο άρθρο στην ονομαστική ή τη γενική
                 if norm_author in search_text or norm_author_genitive in search_text:
-                    
-                    # Καθαρισμός τίτλου για καλύτερη εμφάνιση (αν ξεκινάει με το όνομα)
                     clean_title = title.replace(f"{author}:", "").replace(f"{author} :", "").strip()
                     
                     articles.append({
@@ -61,7 +60,6 @@ def fetch_articles():
                     })
                     break 
 
-    # Κρατάμε μόνο τα μοναδικά links για να αποφύγουμε διπλοεγγραφές
     unique_articles = {article['link']: article for article in articles}.values()
     return list(unique_articles)
 
