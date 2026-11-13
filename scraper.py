@@ -11,10 +11,10 @@ AUTHORS = {
     "Η ΚΑΘΗΜΕΡΙΝΗ": ["Αλέξης Παπαχελάς", "Τάκης Θεοδωρόπουλος", "Μιχάλης Τσιντσίνης", "Κώστας Ιορδανίδης", "Αθανάσιος Έλλις", "Νίκος Κωνσταντάρας", "Παντελής Μπουκάλας", "Τασούλα Καραϊσκάκη", "Ανδρέας Δρυμιώτης", "Μαρία Κατσουνάκη", "Νότης Παπαδόπουλος", "Κώστας Λεονταρίδης", "Ηλίας Μαγκλίνης", "Ξένια Κουναλάκη", "Παναγιώτης Λάμψιας", "Σάκης Μουμτζής", "Κώστας Καλλίτσης", "Άρης Αλεξανδρής", "Θοδωρής Γεωργακόπουλος", "Στάθης Ν. Καλύβας", "Δώρα Αντωνίου", "Γιούλη Επτακοίλη", "Ελεάννα Βλαστού", "Αριστείδης Χατζής", "Χαρίδημος Τσούκας", "Βίβιαν Στεργίου"]
 }
 
-# Προσθέσαμε πολλαπλές πηγές για να είμαστε σίγουροι ότι "σαρώνουμε" τα πάντα
+# ΑΦΑΙΡΕΘΗΚΑΝ οριστικά οι κατάλογοι "arthrografoi". Στοχεύουμε μόνο στα πραγματικά άρθρα.
 PAGES = {
-    "CAPITAL.GR": ["https://www.capital.gr/apopseis/", "https://www.capital.gr/arthrografoi/"],
-    "LIBERAL.GR": ["https://www.liberal.gr/apopseis", "https://www.liberal.gr/arthrografoi"],
+    "CAPITAL.GR": ["https://www.capital.gr/apopseis/"],
+    "LIBERAL.GR": ["https://www.liberal.gr/apopseis"],
     "MONONEWS.GR": ["https://www.mononews.gr/category/apopsis"],
     "Η ΚΑΘΗΜΕΡΙΝΗ": ["https://www.kathimerini.gr/opinions/"]
 }
@@ -34,7 +34,6 @@ def fetch_articles():
     
     for source, urls in PAGES.items():
         for url in urls:
-            print(f"Σάρωση σελίδας: {url}")
             try:
                 response = requests.get(url, headers=HEADERS, timeout=15)
                 soup = BeautifulSoup(response.content, 'html.parser')
@@ -42,31 +41,22 @@ def fetch_articles():
                 for a_tag in soup.find_all('a', href=True):
                     href = a_tag['href']
                     
-                    # 1η Βελτίωση: Ψάχνει τον τίτλο και στο κείμενο και στα attributes της εικόνας
                     title_from_text = a_tag.get_text(separator=' ', strip=True)
                     title_from_attr = a_tag.get('title', '').strip()
-                    # Κρατάει το πιο μεγάλο (το αληθινό)
                     title = title_from_text if len(title_from_text) > len(title_from_attr) else title_from_attr
                     
-                    # 2η Βελτίωση: Χαλαρώσαμε το όριο λέξεων για να μην κόβει μικρούς αληθινούς τίτλους
-                    if len(title.split()) < 3 or len(title) < 12:
-                        continue
-                        
-                    # Αποφυγή links που είναι απλά κατηγορίες ή προφίλ
                     if href.endswith('/apopseis') or href.endswith('/opinions/') or 'author' in href:
                         continue
                         
                     parent = a_tag
                     found_author = None
                     
-                    # Ανεβαίνουμε το HTML δέντρο για να βρούμε τον αρθρογράφο δίπλα στο link
                     for _ in range(6):
                         if not parent or parent.name in ['body', 'html', 'main', 'nav', 'footer']:
                             break
                             
                         parent_text = normalize_greek(parent.get_text(separator=' ', strip=True))
                         
-                        # 3η Βελτίωση: Αυξήσαμε το όριο στους 1500 χαρακτήρες για να χωράνε άρθρα με μεγάλη περίληψη
                         if len(parent_text) > 1500:
                             break
                             
@@ -83,12 +73,15 @@ def fetch_articles():
                         parent = parent.parent
                         
                     if found_author:
-                        # Καθαρισμός τίτλου αν περιέχει το όνομα μέσα (π.χ. "Μ. Καψής: Ο τίτλος")
                         clean_title = title.replace(f"{found_author}:", "").replace(f"{found_author} :", "").strip()
                         if clean_title.upper().startswith(normalize_greek(found_author)):
                             clean_title = clean_title[len(found_author):].strip(" -|:")
                         
-                        # Διόρθωση URL αν λείπει το https
+                        # ΤΕΛΙΚΟΣ ΑΥΣΤΗΡΟΣ ΕΛΕΓΧΟΣ: Αφού καθαριστεί ο τίτλος, αν έχουν μείνει λιγότερες 
+                        # από 4 λέξεις (π.χ. σκέτα ονόματα ή κενά), το απορρίπτουμε οριστικά.
+                        if len(clean_title.split()) < 4:
+                            continue
+                            
                         if not href.startswith('http'):
                             if "CAPITAL" in source: href = "https://www.capital.gr" + href
                             elif "LIBERAL" in source: href = "https://www.liberal.gr" + href
@@ -106,9 +99,14 @@ def fetch_articles():
             except Exception as e:
                 print(f"Σφάλμα κατά τη σάρωση: {e}")
 
-    # Αφαίρεση τυχόν διπλοεγγραφών (αν το βρήκε 2 φορές σε διαφορετικά URLs του ίδιου site)
-    unique_articles = {article['link']: article for article in articles}.values()
-    return list(unique_articles)
+    # Αν βρεθούν διπλά links, κρατάμε την εγγραφή με τον πιο "πλούσιο/σωστό" τίτλο
+    unique_articles = {}
+    for article in articles:
+        link = article['link']
+        if link not in unique_articles or len(article['title']) > len(unique_articles[link]['title']):
+            unique_articles[link] = article
+            
+    return list(unique_articles.values())
 
 if __name__ == "__main__":
     data = fetch_articles()
