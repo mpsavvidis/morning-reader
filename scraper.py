@@ -11,12 +11,12 @@ AUTHORS = {
     "Η ΚΑΘΗΜΕΡΙΝΗ": ["Αλέξης Παπαχελάς", "Τάκης Θεοδωρόπουλος", "Μιχάλης Τσιντσίνης", "Κώστας Ιορδανίδης", "Αθανάσιος Έλλις", "Νίκος Κωνσταντάρας", "Παντελής Μπουκάλας", "Τασούλα Καραϊσκάκη", "Ανδρέας Δρυμιώτης", "Μαρία Κατσουνάκη", "Νότης Παπαδόπουλος", "Κώστας Λεονταρίδης", "Ηλίας Μαγκλίνης", "Ξένια Κουναλάκη", "Παναγιώτης Λάμψιας", "Σάκης Μουμτζής", "Κώστας Καλλίτσης", "Άρης Αλεξανδρής", "Θοδωρής Γεωργακόπουλος", "Στάθης Ν. Καλύβας", "Δώρα Αντωνίου", "Γιούλη Επτακοίλη", "Ελεάννα Βλαστού", "Αριστείδης Χατζής", "Χαρίδημος Τσούκας", "Βίβιαν Στεργίου"]
 }
 
-# ΔΙΟΡΘΩΣΗ: Στοχεύουμε πλέον καθαρά στις ροές των άρθρων, όχι στους καταλόγους ονομάτων
+# Προσθέσαμε πολλαπλές πηγές για να είμαστε σίγουροι ότι "σαρώνουμε" τα πάντα
 PAGES = {
-    "CAPITAL.GR": "https://www.capital.gr/apopseis/", 
-    "LIBERAL.GR": "https://www.liberal.gr/apopseis",
-    "MONONEWS.GR": "https://www.mononews.gr/category/apopsis",
-    "Η ΚΑΘΗΜΕΡΙΝΗ": "https://www.kathimerini.gr/opinions/"
+    "CAPITAL.GR": ["https://www.capital.gr/apopseis/", "https://www.capital.gr/arthrografoi/"],
+    "LIBERAL.GR": ["https://www.liberal.gr/apopseis", "https://www.liberal.gr/arthrografoi"],
+    "MONONEWS.GR": ["https://www.mononews.gr/category/apopsis"],
+    "Η ΚΑΘΗΜΕΡΙΝΗ": ["https://www.kathimerini.gr/opinions/"]
 }
 
 HEADERS = {
@@ -32,74 +32,81 @@ def fetch_articles():
     articles = []
     today_str = datetime.now().strftime("%d.%m.%Y")
     
-    for source, url in PAGES.items():
-        print(f"Σάρωση σελίδας: {source}")
-        try:
-            response = requests.get(url, headers=HEADERS, timeout=15)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            for a_tag in soup.find_all('a', href=True):
-                href = a_tag['href']
+    for source, urls in PAGES.items():
+        for url in urls:
+            print(f"Σάρωση σελίδας: {url}")
+            try:
+                response = requests.get(url, headers=HEADERS, timeout=15)
+                soup = BeautifulSoup(response.content, 'html.parser')
                 
-                # Προσπαθούμε να πάρουμε τον τίτλο πρώτα από το attribute title (συχνό στην Καθημερινή) 
-                # αλλιώς από το κείμενο του link
-                title = a_tag.get('title', '').strip()
-                if not title:
-                    title = a_tag.get_text(strip=True)
-                
-                # ΑΥΣΤΗΡΟ ΦΙΛΤΡΟ: Αν ο τίτλος έχει λιγότερες από 4 λέξεις, απορρίπτεται αμέσως.
-                # Έτσι δεν θα ξαναπιάσει ποτέ ονόματα όπως "Γιώργος Κράλογλου" ως τίτλο.
-                if len(title.split()) < 4 or len(title) < 20:
-                    continue
+                for a_tag in soup.find_all('a', href=True):
+                    href = a_tag['href']
                     
-                # Αποφυγή γενικών links κατηγοριών
-                if href.endswith('/apopseis') or href.endswith('/opinions/'):
-                    continue
+                    # 1η Βελτίωση: Ψάχνει τον τίτλο και στο κείμενο και στα attributes της εικόνας
+                    title_from_text = a_tag.get_text(separator=' ', strip=True)
+                    title_from_attr = a_tag.get('title', '').strip()
+                    # Κρατάει το πιο μεγάλο (το αληθινό)
+                    title = title_from_text if len(title_from_text) > len(title_from_attr) else title_from_attr
                     
-                parent = a_tag
-                found_author = None
-                
-                # Ψάχνουμε τον αρθρογράφο γύρω από το link (έως 5 "κουτιά" πιο έξω στο HTML)
-                for _ in range(5):
-                    if not parent: break
-                    parent_text = normalize_greek(parent.get_text(separator=' ', strip=True))
-                    
-                    if len(parent_text) > 800: # Αν διαβάζει όλη τη σελίδα, σταματάμε
-                        break
+                    # 2η Βελτίωση: Χαλαρώσαμε το όριο λέξεων για να μην κόβει μικρούς αληθινούς τίτλους
+                    if len(title.split()) < 3 or len(title) < 12:
+                        continue
                         
-                    for author in AUTHORS[source]:
-                        norm_author = normalize_greek(author)
-                        norm_author_genitive = norm_author[:-1] if norm_author.endswith('Σ') else norm_author
+                    # Αποφυγή links που είναι απλά κατηγορίες ή προφίλ
+                    if href.endswith('/apopseis') or href.endswith('/opinions/') or 'author' in href:
+                        continue
                         
-                        if norm_author in parent_text or norm_author_genitive in parent_text:
-                            found_author = author
+                    parent = a_tag
+                    found_author = None
+                    
+                    # Ανεβαίνουμε το HTML δέντρο για να βρούμε τον αρθρογράφο δίπλα στο link
+                    for _ in range(6):
+                        if not parent or parent.name in ['body', 'html', 'main', 'nav', 'footer']:
                             break
                             
-                    if found_author:
-                        break
-                    parent = parent.parent
-                    
-                if found_author:
-                    clean_title = title.replace(f"{found_author}:", "").replace(f"{found_author} :", "").strip()
-                    
-                    if not href.startswith('http'):
-                        if "CAPITAL" in source: href = "https://www.capital.gr" + href
-                        elif "LIBERAL" in source: href = "https://www.liberal.gr" + href
-                        elif "ΚΑΘΗΜΕΡΙΝΗ" in source: href = "https://www.kathimerini.gr" + href
-                        elif "MONONEWS" in source: href = "https://www.mononews.gr" + href
+                        parent_text = normalize_greek(parent.get_text(separator=' ', strip=True))
                         
-                    articles.append({
-                        "source": source,
-                        "date": today_str,
-                        "title": clean_title,
-                        "link": href,
-                        "author": found_author
-                    })
-                    
-        except Exception as e:
-            print(f"Σφάλμα κατά τη σάρωση: {e}")
+                        # 3η Βελτίωση: Αυξήσαμε το όριο στους 1500 χαρακτήρες για να χωράνε άρθρα με μεγάλη περίληψη
+                        if len(parent_text) > 1500:
+                            break
+                            
+                        for author in AUTHORS[source]:
+                            norm_author = normalize_greek(author)
+                            norm_author_genitive = norm_author[:-1] if norm_author.endswith('Σ') else norm_author
+                            
+                            if norm_author in parent_text or norm_author_genitive in parent_text:
+                                found_author = author
+                                break
+                                
+                        if found_author:
+                            break
+                        parent = parent.parent
+                        
+                    if found_author:
+                        # Καθαρισμός τίτλου αν περιέχει το όνομα μέσα (π.χ. "Μ. Καψής: Ο τίτλος")
+                        clean_title = title.replace(f"{found_author}:", "").replace(f"{found_author} :", "").strip()
+                        if clean_title.upper().startswith(normalize_greek(found_author)):
+                            clean_title = clean_title[len(found_author):].strip(" -|:")
+                        
+                        # Διόρθωση URL αν λείπει το https
+                        if not href.startswith('http'):
+                            if "CAPITAL" in source: href = "https://www.capital.gr" + href
+                            elif "LIBERAL" in source: href = "https://www.liberal.gr" + href
+                            elif "ΚΑΘΗΜΕΡΙΝΗ" in source: href = "https://www.kathimerini.gr" + href
+                            elif "MONONEWS" in source: href = "https://www.mononews.gr" + href
+                            
+                        articles.append({
+                            "source": source,
+                            "date": today_str,
+                            "title": clean_title,
+                            "link": href,
+                            "author": found_author
+                        })
+                        
+            except Exception as e:
+                print(f"Σφάλμα κατά τη σάρωση: {e}")
 
-    # Αφαίρεση τυχόν διπλών άρθρων
+    # Αφαίρεση τυχόν διπλοεγγραφών (αν το βρήκε 2 φορές σε διαφορετικά URLs του ίδιου site)
     unique_articles = {article['link']: article for article in articles}.values()
     return list(unique_articles)
 
